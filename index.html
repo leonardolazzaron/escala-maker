@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Escala Maker — Everyday Devocional</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;400;600&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="app-shell">
+
+    <!-- HEADER -->
+    <header class="app-header">
+      <div class="header-logo">
+        <span class="logo-mark">✦</span>
+        <span class="logo-text">Escala Maker</span>
+      </div>
+      <div class="header-sub">Everyday Devocional</div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="app-main">
+
+      <!-- MÊS -->
+      <section class="section">
+        <div class="section-label">MÊS</div>
+        <div class="month-grid" id="monthGrid"></div>
+        <div class="month-info" id="monthInfo"></div>
+      </section>
+
+      <div class="separator"></div>
+
+      <!-- MEMBROS -->
+      <section class="section">
+        <div class="section-label">MEMBROS</div>
+        <div class="input-row">
+          <input type="text" id="inputNome" class="text-input" placeholder="Nome do membro…" autocomplete="off" />
+          <button class="btn-secondary" onclick="adicionarNome()">Adicionar</button>
+        </div>
+        <ul class="list-items" id="listNomes" data-label="nomes"></ul>
+        <div class="list-actions">
+          <button class="btn-secondary btn-sm" onclick="limparLista('nomes')">Limpar lista</button>
+        </div>
+      </section>
+
+      <div class="separator"></div>
+
+      <!-- SALMOS -->
+      <section class="section">
+        <div class="section-label">SALMOS</div>
+        <div class="input-row">
+          <input type="text" id="inputSalmo" class="text-input" placeholder="Ex: 57 ou 57:1-5" autocomplete="off" />
+          <button class="btn-secondary" onclick="adicionarSalmo()">Adicionar</button>
+        </div>
+        <div class="error-msg" id="salmoErro"></div>
+        <ul class="list-items" id="listSalmos" data-label="salmos"></ul>
+        <div class="list-actions">
+          <button class="btn-secondary btn-sm" onclick="limparLista('salmos')">Limpar lista</button>
+        </div>
+      </section>
+
+      <div class="separator"></div>
+
+      <!-- AÇÃO -->
+      <section class="section">
+        <div class="status-msg" id="statusMsg" style="display:none"></div>
+        <div class="progress-bar-wrap" id="progressWrap" style="display:none">
+          <div class="progress-bar-inner" id="progressBar"></div>
+        </div>
+        <button class="btn-primary" id="btnGerar" onclick="gerarEscala()">Gerar Escala</button>
+      </section>
+
+    </main>
+
+    <!-- PREVIEW / RESULTADO -->
+    <div class="result-panel" id="resultPanel" style="display:none">
+      <div class="result-header">
+        <span class="result-title">Imagens Geradas</span>
+        <button class="btn-secondary btn-sm" onclick="baixarTudo()">⬇ Baixar todas</button>
+      </div>
+      <div class="result-grid" id="resultGrid"></div>
+    </div>
+
+  </div>
+
+  <!-- Canvas oculto para geração das imagens -->
+  <canvas id="offscreen" style="display:none"></canvas>
+
+  <script src="app.js"></script>
+</body>
+</html>
