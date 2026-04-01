@@ -1,13 +1,13 @@
 /**
  * app.js — Escala Maker Web
  * Porta fiel da lógica Python para JavaScript puro.
- * Geração de imagens via Canvas API, download via Blob.
+ * Headers carregados de assets/ (semana-N.png, <mes>.png, escala-maker.png).
  */
 
 'use strict';
 
 // ══════════════════════════════════════════════════════════════
-// CONFIGURAÇÕES (espelha o script original)
+// CONFIGURAÇÕES
 // ══════════════════════════════════════════════════════════════
 const MESES_PT = {
   janeiro: 31, fevereiro: 28, março: 31,    abril: 30,
@@ -17,26 +17,43 @@ const MESES_PT = {
 const MESES_DISPLAY = Object.keys(MESES_PT).map(m => m[0].toUpperCase() + m.slice(1));
 
 const CANVAS_W = 1600, CANVAS_H = 2000;
-const TABLE_L = 86, TABLE_R = 1514, TABLE_W = TABLE_R - TABLE_L;
-const DIV1 = 341, DIV2 = 1234;
-const BORDER = 2, HDR_H = 55, ROW_H = 50;
+const TABLE_L = 86,  TABLE_R = 1514;
+const DIV1 = 341,    DIV2 = 1234;
+const BORDER = 2,    HDR_H = 55,  ROW_H = 50;
 const SZ_TABLE_HDR = 28, SZ_TABLE_BODY = 25;
 
-// Tabela mensal
 const M_TABLE_L = 304, M_TABLE_R = 1295;
-const M_DIV1 = 481, M_DIV2 = 1102;
-const M_HDR_H = 68, M_ROW_H = 40.84;
-const M_SZ_HDR = 24, M_SZ_BODY = 21;
+const M_DIV1 = 481,    M_DIV2 = 1102;
+const M_HDR_H = 68,    M_ROW_H = 40.84;
+const M_SZ_HDR = 24,   M_SZ_BODY = 21;
+
+const FONT_FAMILY = "'DM Sans', Arial, sans-serif";
+const ASSETS      = 'assets/';
 
 // ══════════════════════════════════════════════════════════════
-// ESTADO DA APLICAÇÃO
+// ESTADO
 // ══════════════════════════════════════════════════════════════
 const state = {
   mes: '',
   nomes: [],
   salmos: [],
-  imageBlobs: [],   // { name, blob, url }
+  imageBlobs: [],
 };
+
+// ══════════════════════════════════════════════════════════════
+// CACHE DE IMAGENS
+// ══════════════════════════════════════════════════════════════
+const imgCache = {};
+
+function loadImage(src) {
+  if (imgCache[src]) return Promise.resolve(imgCache[src]);
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload  = () => { imgCache[src] = img; resolve(img); };
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
 
 // ══════════════════════════════════════════════════════════════
 // INIT
@@ -46,7 +63,23 @@ document.addEventListener('DOMContentLoaded', () => {
   setupInputListeners();
   setupDragDrop('listNomes');
   setupDragDrop('listSalmos');
+  carregarLogoApp();
 });
+
+// Logo do header do app vindo de assets/escala-maker.png
+async function carregarLogoApp() {
+  const img = await loadImage(`${ASSETS}escala-maker.png`);
+  if (!img) return;
+  const logoImg = document.getElementById('appLogoImg');
+  if (logoImg) {
+    logoImg.src = img.src;
+    logoImg.style.display = 'block';
+    const svgFallback = document.querySelector('.logo-sun');
+    const txtFallback = document.querySelector('.logo-text');
+    if (svgFallback) svgFallback.style.display = 'none';
+    if (txtFallback) txtFallback.style.display  = 'none';
+  }
+}
 
 // ══════════════════════════════════════════════════════════════
 // GRID DE MESES
@@ -65,24 +98,19 @@ function buildMonthGrid() {
 
 function selecionarMes(mes) {
   state.mes = mes;
-  document.querySelectorAll('.btn-mes').forEach(b => {
-    b.classList.toggle('selected', b.dataset.mes === mes);
-  });
+  document.querySelectorAll('.btn-mes').forEach(b =>
+    b.classList.toggle('selected', b.dataset.mes === mes)
+  );
   const dias = MESES_PT[mes.toLowerCase()];
-  const info = document.getElementById('monthInfo');
-  info.textContent = `${mes} · ${dias} dias`;
+  document.getElementById('monthInfo').textContent = `${mes} · ${dias} dias`;
 }
 
 // ══════════════════════════════════════════════════════════════
-// INPUT LISTENERS (Enter para adicionar)
+// INPUTS
 // ══════════════════════════════════════════════════════════════
 function setupInputListeners() {
-  document.getElementById('inputNome').addEventListener('keydown', e => {
-    if (e.key === 'Enter') adicionarNome();
-  });
-  document.getElementById('inputSalmo').addEventListener('keydown', e => {
-    if (e.key === 'Enter') adicionarSalmo();
-  });
+  document.getElementById('inputNome').addEventListener('keydown',  e => { if (e.key === 'Enter') adicionarNome(); });
+  document.getElementById('inputSalmo').addEventListener('keydown', e => { if (e.key === 'Enter') adicionarSalmo(); });
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -93,9 +121,8 @@ function adicionarNome() {
   const txt = input.value.trim();
   if (!txt) return;
   state.nomes.push(txt);
-  renderListItem('listNomes', txt, state.nomes.length - 1, 'nomes');
-  input.value = '';
-  input.focus();
+  renderListItem('listNomes', txt, 'nomes');
+  input.value = ''; input.focus();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -111,9 +138,8 @@ function adicionarSalmo() {
   }
   showErroSalmo('');
   state.salmos.push(txt);
-  renderListItem('listSalmos', `Salmo ${txt}`, state.salmos.length - 1, 'salmos');
-  input.value = '';
-  input.focus();
+  renderListItem('listSalmos', `Salmo ${txt}`, 'salmos');
+  input.value = ''; input.focus();
 }
 
 function showErroSalmo(msg) {
@@ -123,14 +149,13 @@ function showErroSalmo(msg) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// RENDERIZAÇÃO DE LISTA
+// LISTAS
 // ══════════════════════════════════════════════════════════════
-function renderListItem(listId, label, index, dataKey) {
+function renderListItem(listId, label, dataKey) {
   const list = document.getElementById(listId);
-  const li = document.createElement('li');
+  const li   = document.createElement('li');
   li.className = 'list-item';
   li.draggable = true;
-  li.dataset.index = index;
 
   const span = document.createElement('span');
   span.className = 'list-item-text';
@@ -139,7 +164,6 @@ function renderListItem(listId, label, index, dataKey) {
   const btn = document.createElement('button');
   btn.className = 'list-item-remove';
   btn.innerHTML = '×';
-  btn.title = 'Remover';
   btn.addEventListener('click', () => removerItem(listId, li, dataKey));
 
   li.appendChild(span);
@@ -148,21 +172,18 @@ function renderListItem(listId, label, index, dataKey) {
 }
 
 function removerItem(listId, li, dataKey) {
-  const list = document.getElementById(listId);
-  const items = Array.from(list.children);
-  const idx = items.indexOf(li);
+  const idx = Array.from(document.getElementById(listId).children).indexOf(li);
   if (idx !== -1) state[dataKey].splice(idx, 1);
   li.remove();
 }
 
 function limparLista(dataKey) {
   state[dataKey] = [];
-  const listId = dataKey === 'nomes' ? 'listNomes' : 'listSalmos';
-  document.getElementById(listId).innerHTML = '';
+  document.getElementById(dataKey === 'nomes' ? 'listNomes' : 'listSalmos').innerHTML = '';
 }
 
 // ══════════════════════════════════════════════════════════════
-// DRAG & DROP nas listas
+// DRAG & DROP
 // ══════════════════════════════════════════════════════════════
 function setupDragDrop(listId) {
   const list = document.getElementById(listId);
@@ -178,39 +199,32 @@ function setupDragDrop(listId) {
   });
   list.addEventListener('dragover', e => {
     e.preventDefault();
-    const target = e.target.closest('.list-item');
-    if (target && target !== dragSrc) {
+    const t = e.target.closest('.list-item');
+    if (t && t !== dragSrc) {
       list.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-      target.classList.add('drag-over');
+      t.classList.add('drag-over');
     }
   });
   list.addEventListener('drop', e => {
     e.preventDefault();
-    const target = e.target.closest('.list-item');
-    if (target && dragSrc && target !== dragSrc) {
+    const t = e.target.closest('.list-item');
+    if (t && dragSrc && t !== dragSrc) {
       const items = Array.from(list.children);
-      const fromIdx = items.indexOf(dragSrc);
-      const toIdx   = items.indexOf(target);
-      if (fromIdx !== -1 && toIdx !== -1) {
-        // Reordena no DOM
-        if (fromIdx < toIdx) list.insertBefore(dragSrc, target.nextSibling);
-        else list.insertBefore(dragSrc, target);
-      }
+      const fi = items.indexOf(dragSrc), ti = items.indexOf(t);
+      if (fi !== -1 && ti !== -1)
+        list.insertBefore(dragSrc, fi < ti ? t.nextSibling : t);
     }
     list.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
   });
 }
 
-// Sincroniza arrays com a ordem visual da lista
 function syncLists() {
-  const nomesEls  = document.getElementById('listNomes').querySelectorAll('.list-item-text');
-  const salmosEls = document.getElementById('listSalmos').querySelectorAll('.list-item-text');
-  state.nomes  = Array.from(nomesEls).map(el => el.textContent.trim());
-  state.salmos = Array.from(salmosEls).map(el => el.textContent.replace('Salmo ', '').trim());
+  state.nomes  = Array.from(document.getElementById('listNomes').querySelectorAll('.list-item-text')).map(el => el.textContent.trim());
+  state.salmos = Array.from(document.getElementById('listSalmos').querySelectorAll('.list-item-text')).map(el => el.textContent.replace('Salmo ', '').trim());
 }
 
 // ══════════════════════════════════════════════════════════════
-// LÓGICA DE ESCALA (porta fiel do Python)
+// LÓGICA DE ESCALA
 // ══════════════════════════════════════════════════════════════
 function embaralharSemConsecutivos(fila) {
   if (!fila.length) return fila;
@@ -221,18 +235,13 @@ function embaralharSemConsecutivos(fila) {
     for (let i = 1; i < fila.length; i++) {
       if (fila[i] === fila[i - 1]) {
         ok = false;
-        const candidatos = [];
-        for (let j = i + 1; j < fila.length; j++) candidatos.push(j);
-        shuffle(candidatos);
-        let swapped = false;
-        for (const j of candidatos) {
-          if (fila[j] !== fila[i - 1]) {
-            [fila[i], fila[j]] = [fila[j], fila[i]];
-            swapped = true;
-            break;
-          }
+        const cands = Array.from({length: fila.length - i - 1}, (_, j) => i + 1 + j);
+        shuffle(cands);
+        let sw = false;
+        for (const j of cands) {
+          if (fila[j] !== fila[i - 1]) { [fila[i], fila[j]] = [fila[j], fila[i]]; sw = true; break; }
         }
-        if (!swapped) { shuffle(fila); break; }
+        if (!sw) { shuffle(fila); break; }
       }
     }
     if (ok) break;
@@ -248,306 +257,170 @@ function shuffle(arr) {
 }
 
 function distribuirEscala(totalDias, nomes, salmos) {
-  const escala = [];
-  let si = 0;
+  const escala = []; let si = 0;
   if (!nomes.length) {
-    for (let dia = 1; dia <= totalDias; dia++) {
-      const s = si < salmos.length ? salmos[si++] : '-';
-      escala.push([dia, '-', s]);
-    }
+    for (let d = 1; d <= totalDias; d++) escala.push([d, '-', si < salmos.length ? salmos[si++] : '-']);
     return escala;
   }
   const fila = embaralharSemConsecutivos([...nomes, ...nomes]);
   const intercalar = (nomes.length * 2) < totalDias;
-  const seq = [];
-  if (intercalar) {
-    let ni = 0;
-    for (let i = 0; i < totalDias; i++) {
-      if (i % 2 === 0 && ni < fila.length) seq.push(fila[ni++]);
-      else seq.push('-');
-    }
-  } else {
-    let ni = 0;
-    for (let i = 0; i < totalDias; i++) {
-      seq.push(ni < fila.length ? fila[ni++] : '-');
-    }
+  const seq = []; let ni = 0;
+  for (let i = 0; i < totalDias; i++) {
+    if (intercalar) seq.push(i % 2 === 0 && ni < fila.length ? fila[ni++] : '-');
+    else seq.push(ni < fila.length ? fila[ni++] : '-');
   }
-  seq.forEach((membro, idx) => {
-    const s = si < salmos.length ? salmos[si++] : '-';
-    escala.push([idx + 1, membro, s]);
-  });
+  seq.forEach((m, idx) => escala.push([idx + 1, m, si < salmos.length ? salmos[si++] : '-']));
   return escala;
 }
 
 function dividirSemanas(escala) {
-  const semanas = [];
-  for (let i = 0; i < escala.length; i += 7) semanas.push(escala.slice(i, i + 7));
-  return semanas;
+  const s = [];
+  for (let i = 0; i < escala.length; i += 7) s.push(escala.slice(i, i + 7));
+  return s;
 }
 
 // ══════════════════════════════════════════════════════════════
-// GERAÇÃO DE IMAGENS VIA CANVAS
+// CANVAS HELPERS
 // ══════════════════════════════════════════════════════════════
-const FONT_FAMILY = "'DM Sans', Arial, sans-serif";
-const SUN_COLOR   = '#D45F2A';
-
-// ══════════════════════════════════════════════════════════════
-// DESENHAR SOL NO CANVAS (fiel ao logo original)
-// cx, cy = centro do semicírculo; r = raio
-// ══════════════════════════════════════════════════════════════
-function desenharSol(ctx, cx, cy, r) {
-  const sw = Math.max(2, r * 0.09);   // espessura dos traços proporcional
-  ctx.save();
-  ctx.strokeStyle = SUN_COLOR;
-  ctx.lineCap = 'round';
-  ctx.lineWidth = sw;
-
-  // ── semicírculo ──────────────────────────────────────────
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, Math.PI, 0, false);
-  ctx.stroke();
-
-  // ── linha do horizonte ───────────────────────────────────
-  ctx.lineWidth = sw * 0.85;
-  ctx.beginPath();
-  ctx.moveTo(cx - r * 1.55, cy);
-  ctx.lineTo(cx + r * 1.55, cy);
-  ctx.stroke();
-
-  // ── raio central (topo) ──────────────────────────────────
-  ctx.lineWidth = sw;
-  ctx.beginPath();
-  ctx.moveTo(cx, cy - r * 1.55);
-  ctx.lineTo(cx, cy - r * 1.15);
-  ctx.stroke();
-
-  // ── raios diagonais (45°) ────────────────────────────────
-  const d45 = r * 0.707;
-  // superior esquerdo
-  ctx.beginPath();
-  ctx.moveTo(cx - d45 * 1.45, cy - d45 * 1.45);
-  ctx.lineTo(cx - d45 * 1.10, cy - d45 * 1.10);
-  ctx.stroke();
-  // superior direito
-  ctx.beginPath();
-  ctx.moveTo(cx + d45 * 1.45, cy - d45 * 1.45);
-  ctx.lineTo(cx + d45 * 1.10, cy - d45 * 1.10);
-  ctx.stroke();
-
-  // ── raios laterais (horizontais) ─────────────────────────
-  // esquerdo inferior (~30° abaixo do horizonte)
-  const ang = Math.PI / 6;
-  const lx  = Math.cos(Math.PI - ang) * r, ly = -Math.sin(Math.PI - ang) * r;
-  ctx.beginPath();
-  ctx.moveTo(cx + lx * 1.45, cy + ly * 1.45);
-  ctx.lineTo(cx + lx * 1.10, cy + ly * 1.10);
-  ctx.stroke();
-  // direito inferior
-  ctx.beginPath();
-  ctx.moveTo(cx - lx * 1.45, cy + ly * 1.45);
-  ctx.lineTo(cx - lx * 1.10, cy + ly * 1.10);
-  ctx.stroke();
-
-  ctx.restore();
-}
-
 function getCanvas(w, h) {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   return c;
 }
 
-function desenharTabela(ctx, linhas, yIni, cw) {
-  const k  = cw / CANVAS_W;
-  const L  = Math.round(TABLE_L * k), R  = Math.round(TABLE_R * k);
-  const d1 = Math.round(DIV1 * k),    d2 = Math.round(DIV2 * k);
-  const fh = Math.round(SZ_TABLE_HDR * k);
-  const fb = Math.round(SZ_TABLE_BODY * k);
-  const bw = Math.max(1, Math.round(BORDER * k));
-  const hh = Math.round(HDR_H * k);
-  const rh = Math.round(ROW_H * k);
-
-  ctx.fillStyle = '#000';
-  ctx.lineWidth = bw;
-  ctx.strokeStyle = '#000';
-
-  // Header box
-  const y0 = yIni, y1 = yIni + hh;
-  strokeRect(ctx, L, y0, R, y1, d1, d2);
-  ctx.font = `600 ${fh}px ${FONT_FAMILY}`;
-  textCenter(ctx, 'Dia',    L,  d1, y0, hh, fh);
-  textCenter(ctx, 'Membro', d1, d2, y0, hh, fh);
-  textCenter(ctx, 'Salmos', d2, R,  y0, hh, fh);
-
-  // Rows
-  ctx.font = `${fb}px ${FONT_FAMILY}`;
-  linhas.forEach(([dia, membro, salmo], idx) => {
-    const yi = y1 + idx * rh, yf = yi + rh;
-    strokeRect(ctx, L, yi, R, yf, d1, d2);
-    textCenter(ctx, String(dia),    L,  d1, yi, rh, fb);
-    textCenter(ctx, String(membro), d1, d2, yi, rh, fb);
-    textCenter(ctx, String(salmo),  d2, R,  yi, rh, fb);
-  });
-
-  return y1 + linhas.length * rh;
+function canvas45(h) {
+  const hStd = Math.round(CANVAS_W * 5 / 4);
+  if (h <= hStd) return [CANVAS_W, hStd];
+  const hN = Math.ceil(h / 4) * 4;
+  return [Math.round(hN * 4 / 5), hN];
 }
 
-function strokeRect(ctx, x0, y0, x1, y1, d1, d2) {
+function strokeCells(ctx, x0, y0, x1, y1, d1, d2) {
   ctx.beginPath();
-  ctx.moveTo(x0, y0); ctx.lineTo(x1, y0);
-  ctx.moveTo(x0, y1); ctx.lineTo(x1, y1);
-  ctx.moveTo(x0, y0); ctx.lineTo(x0, y1);
-  ctx.moveTo(x1, y0); ctx.lineTo(x1, y1);
-  ctx.moveTo(d1, y0); ctx.lineTo(d1, y1);
-  ctx.moveTo(d2, y0); ctx.lineTo(d2, y1);
+  [[x0,y0,x1,y0],[x0,y1,x1,y1],[x0,y0,x0,y1],[x1,y0,x1,y1],[d1,y0,d1,y1],[d2,y0,d2,y1]]
+    .forEach(([ax,ay,bx,by]) => { ctx.moveTo(ax,ay); ctx.lineTo(bx,by); });
   ctx.stroke();
 }
 
-function textCenter(ctx, text, xa, xb, yt, rowH, fontSize) {
+function textCenter(ctx, text, xa, xb, yt, rh, fs) {
   const tw = ctx.measureText(text).width;
-  const x  = xa + (xb - xa - tw) / 2;
-  const y  = yt + (rowH + fontSize * 0.75) / 2 - fontSize * 0.15;
-  ctx.fillText(text, x, y);
+  ctx.fillText(text, xa + (xb - xa - tw) / 2, yt + (rh + fs * 0.75) / 2 - fs * 0.15);
 }
 
-function canvas45(alturaConteudo) {
-  const hStd = Math.round(CANVAS_W * 5 / 4);
-  if (alturaConteudo <= hStd) return [CANVAS_W, hStd];
-  const hNew = Math.ceil(alturaConteudo / 4) * 4;
-  const wNew = Math.round(hNew * 4 / 5);
-  return [wNew, hNew];
-}
+function desenharTabela(ctx, linhas, yIni, cw) {
+  const k = cw / CANVAS_W;
+  const L = Math.round(TABLE_L*k), R = Math.round(TABLE_R*k);
+  const d1 = Math.round(DIV1*k),   d2 = Math.round(DIV2*k);
+  const fh = Math.round(SZ_TABLE_HDR*k),  fb = Math.round(SZ_TABLE_BODY*k);
+  const bw = Math.max(1, Math.round(BORDER*k));
+  const hh = Math.round(HDR_H*k),  rh = Math.round(ROW_H*k);
 
-// ── Gerar imagem SEMANAL ──────────────────────────────────────
-function gerarSemanal(linhas, num, mes) {
-  // Layout vertical (proporcional ao original Python):
-  // topo  → sol
-  // abaixo → "SEMANA N"
-  // gap   → tabela
-  const SOL_CY      = 340;   // centro Y do semicírculo
-  const SOL_R       = 180;   // raio
-  const TITULO_Y    = SOL_CY + 80;   // baseline do texto
-  const TAB_TOP     = TITULO_Y + 120;
-  const tabBot      = TAB_TOP + HDR_H + linhas.length * ROW_H;
-  const neededH     = tabBot + 200;
-  const [cw, ch]    = canvas45(neededH);
-  const k           = cw / CANVAS_W;
+  ctx.strokeStyle = '#000'; ctx.fillStyle = '#000'; ctx.lineWidth = bw;
 
-  const canvas = getCanvas(cw, ch);
-  const ctx    = canvas.getContext('2d');
+  const y0 = yIni, y1 = yIni + hh;
+  strokeCells(ctx, L, y0, R, y1, d1, d2);
+  ctx.font = `600 ${fh}px ${FONT_FAMILY}`;
+  textCenter(ctx, 'Dia', L, d1, y0, hh, fh);
+  textCenter(ctx, 'Membro', d1, d2, y0, hh, fh);
+  textCenter(ctx, 'Salmos', d2, R, y0, hh, fh);
 
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, cw, ch);
-
-  // Sol
-  desenharSol(ctx, cw / 2, Math.round(SOL_CY * k), Math.round(SOL_R * k));
-
-  // Título "SEMANA N"
-  ctx.fillStyle = '#000';
-  const szTitulo = Math.round(72 * k);
-  ctx.font = `500 ${szTitulo}px ${FONT_FAMILY}`;
-  ctx.letterSpacing = `${Math.round(4 * k)}px`;
-  const titleTxt = `SEMANA ${num}`;
-  const tw = ctx.measureText(titleTxt).width;
-  ctx.fillText(titleTxt, (cw - tw) / 2, Math.round(TITULO_Y * k));
-
-  // Tabela
-  ctx.fillStyle  = '#000';
-  ctx.letterSpacing = '0px';
-  desenharTabela(ctx, linhas, Math.round(TAB_TOP * k), cw);
-
-  return canvas;
-}
-
-// ── Gerar imagem MENSAL ───────────────────────────────────────
-function gerarMensal(escala, mes) {
-  const cw = CANVAS_W, ch = CANVAS_H;
-  const nRows = escala.length;
-
-  // Layout vertical (espelha o original Python):
-  // sol centralizado no topo, depois nome do mês, depois tabela
-  const SOL_CY   = 310;
-  const SOL_R    = 200;
-  const TITULO_Y = SOL_CY + 100;   // baseline do nome do mês
-  const GAP_TABLE = 100;
-  const tituloH  = TITULO_Y + GAP_TABLE;
-
-  let rowH = Math.round(M_ROW_H);
-  const conteudo = tituloH + M_HDR_H + nRows * rowH;
-  let margin = Math.round((ch - conteudo) / 2);
-  if (margin < 40) {
-    margin = 40;
-    const availRows = ch - margin - tituloH - M_HDR_H;
-    rowH = Math.max(22, Math.round(availRows / nRows));
-  }
-  // Recompute tableY using actual margin (top offset)
-  const topOffset  = margin < 60 ? 60 : margin * 0.3;
-  const solCyReal  = topOffset + SOL_R + 40;
-  const tituloYReal = solCyReal + 90;
-  const tableY     = tituloYReal + GAP_TABLE;
-
-  const scaleFont = rowH / M_ROW_H;
-  const szHdr  = Math.max(14, Math.round(M_SZ_HDR  * scaleFont));
-  const szBody = Math.max(12, Math.round(M_SZ_BODY * scaleFont));
-
-  const canvas = getCanvas(cw, ch);
-  const ctx = canvas.getContext('2d');
-
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, cw, ch);
-
-  // Sol
-  desenharSol(ctx, cw / 2, solCyReal, SOL_R);
-
-  // Nome do mês
-  ctx.fillStyle = '#000';
-  ctx.font = `400 100px ${FONT_FAMILY}`;
-  ctx.letterSpacing = '10px';
-  const mesTitle = mes.toUpperCase();
-  const titleW = ctx.measureText(mesTitle).width;
-  ctx.fillText(mesTitle, (cw - titleW) / 2, tituloYReal);
-
-  // Tabela mensal
-  ctx.letterSpacing = '0px';
-  desenharTabelaMensal(ctx, escala, tableY, rowH, M_HDR_H, szHdr, szBody);
-
-  return canvas;
+  ctx.font = `${fb}px ${FONT_FAMILY}`;
+  linhas.forEach(([dia, membro, salmo], idx) => {
+    const yi = y1 + idx*rh, yf = yi + rh;
+    strokeCells(ctx, L, yi, R, yf, d1, d2);
+    textCenter(ctx, String(dia), L, d1, yi, rh, fb);
+    textCenter(ctx, String(membro), d1, d2, yi, rh, fb);
+    textCenter(ctx, String(salmo), d2, R, yi, rh, fb);
+  });
 }
 
 function desenharTabelaMensal(ctx, linhas, yIni, rowH, hdrH, szHdr, szBody) {
   const L = M_TABLE_L, R = M_TABLE_R, d1 = M_DIV1, d2 = M_DIV2;
+  ctx.strokeStyle = '#000'; ctx.fillStyle = '#000'; ctx.lineWidth = BORDER;
 
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = BORDER;
-
-  // Header
   const y0 = yIni, y1 = yIni + hdrH;
-  strokeRectM(ctx, L, y0, R, y1, d1, d2);
-  ctx.fillStyle = '#000';
+  strokeCells(ctx, L, y0, R, y1, d1, d2);
   ctx.font = `600 ${szHdr}px ${FONT_FAMILY}`;
-  textCenter(ctx, 'Dia',    L,  d1, y0, hdrH, szHdr);
+  textCenter(ctx, 'Dia', L, d1, y0, hdrH, szHdr);
   textCenter(ctx, 'Membro', d1, d2, y0, hdrH, szHdr);
-  textCenter(ctx, 'Salmos', d2, R,  y0, hdrH, szHdr);
+  textCenter(ctx, 'Salmos', d2, R, y0, hdrH, szHdr);
 
   ctx.font = `${szBody}px ${FONT_FAMILY}`;
   linhas.forEach(([dia, membro, salmo], idx) => {
-    const yi = y1 + idx * rowH, yf = yi + rowH;
-    strokeRectM(ctx, L, yi, R, yf, d1, d2);
-    textCenter(ctx, String(dia),    L,  d1, yi, rowH, szBody);
+    const yi = y1 + idx*rowH, yf = yi + rowH;
+    strokeCells(ctx, L, yi, R, yf, d1, d2);
+    textCenter(ctx, String(dia), L, d1, yi, rowH, szBody);
     textCenter(ctx, String(membro), d1, d2, yi, rowH, szBody);
-    textCenter(ctx, String(salmo),  d2, R,  yi, rowH, szBody);
+    textCenter(ctx, String(salmo), d2, R, yi, rowH, szBody);
   });
 }
 
-function strokeRectM(ctx, x0, y0, x1, y1, d1, d2) {
-  ctx.beginPath();
-  ctx.moveTo(x0, y0); ctx.lineTo(x1, y0);
-  ctx.moveTo(x0, y1); ctx.lineTo(x1, y1);
-  ctx.moveTo(x0, y0); ctx.lineTo(x0, y1);
-  ctx.moveTo(x1, y0); ctx.lineTo(x1, y1);
-  ctx.moveTo(d1, y0); ctx.lineTo(d1, y1);
-  ctx.moveTo(d2, y0); ctx.lineTo(d2, y1);
-  ctx.stroke();
+// ══════════════════════════════════════════════════════════════
+// GERAÇÃO DAS IMAGENS
+// ══════════════════════════════════════════════════════════════
+
+// SEMANAL — usa assets/semana-N.png como header
+// O Python posiciona a imagem em y=307 e a tabela em y≈1382 (base CANVAS_W=1600)
+async function gerarSemanal(linhas, num) {
+  const hdrImg       = await loadImage(`${ASSETS}semana-${num}.png`);
+  const TAB_TOP_BASE = 1382;
+  const tabBot       = TAB_TOP_BASE + HDR_H + linhas.length * ROW_H;
+  const [cw, ch]     = canvas45(tabBot + 200);
+  const k            = cw / CANVAS_W;
+
+  const canvas = getCanvas(cw, ch);
+  const ctx    = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, cw, ch);
+
+  if (hdrImg) {
+    // Escala para 90% da largura do canvas, mantendo proporção, centralizado
+    const scale = (cw * 0.9) / hdrImg.width;
+    const imgW  = Math.round(hdrImg.width  * scale);
+    const imgH  = Math.round(hdrImg.height * scale);
+    ctx.drawImage(hdrImg, Math.round((cw - imgW) / 2), Math.round(307 * k), imgW, imgH);
+  }
+
+  desenharTabela(ctx, linhas, Math.round(TAB_TOP_BASE * k), cw);
+  return canvas;
+}
+
+// MENSAL — usa assets/<mes>.png como header
+// O Python posiciona a imagem com crop no topo (MONTHLY_IMG_Y ≈ -242)
+// e a tabela começa em torno de y=750-800
+async function gerarMensal(escala, mes) {
+  const hdrImg = await loadImage(`${ASSETS}${mes.toLowerCase()}.png`);
+
+  const cw = CANVAS_W, ch = CANVAS_H;
+  const nRows     = escala.length;
+  const HDR_BLOCK = 780;   // altura reservada para o bloco de header
+  const GAP_TABLE = 60;
+
+  let rowH = Math.round(M_ROW_H);
+  let topPad = Math.round((ch - HDR_BLOCK - GAP_TABLE - M_HDR_H - nRows * rowH) / 2);
+  if (topPad < 40) {
+    topPad = 40;
+    rowH = Math.max(22, Math.round((ch - topPad - HDR_BLOCK - GAP_TABLE - M_HDR_H) / nRows));
+  }
+
+  const tableY    = topPad + HDR_BLOCK + GAP_TABLE;
+  const scaleFont = rowH / M_ROW_H;
+  const szHdr     = Math.max(14, Math.round(M_SZ_HDR  * scaleFont));
+  const szBody    = Math.max(12, Math.round(M_SZ_BODY * scaleFont));
+
+  const canvas = getCanvas(cw, ch);
+  const ctx    = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, cw, ch);
+
+  if (hdrImg) {
+    // Escala para largura total do canvas; sobe ~18% para simular o crop do Python
+    const imgH = Math.round(hdrImg.height * (cw / hdrImg.width));
+    ctx.drawImage(hdrImg, 0, topPad - Math.round(imgH * 0.18), cw, imgH);
+  }
+
+  desenharTabelaMensal(ctx, escala, tableY, rowH, M_HDR_H, szHdr, szBody);
+  return canvas;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -556,31 +429,19 @@ function strokeRectM(ctx, x0, y0, x1, y1, d1, d2) {
 async function gerarEscala() {
   syncLists();
 
-  // Validações
-  if (!state.mes) {
-    showStatus('Selecione um mês antes de gerar.', 'err'); return;
-  }
-  if (!state.nomes.length) {
-    showStatus('Adicione ao menos um membro.', 'err'); return;
-  }
-  if (!state.salmos.length) {
-    showStatus('Adicione ao menos um Salmo.', 'err'); return;
-  }
+  if (!state.mes)           { showStatus('Selecione um mês antes de gerar.', 'err');  return; }
+  if (!state.nomes.length)  { showStatus('Adicione ao menos um membro.', 'err');      return; }
+  if (!state.salmos.length) { showStatus('Adicione ao menos um Salmo.', 'err');       return; }
 
-  // UI → loading
   const btn = document.getElementById('btnGerar');
-  btn.disabled = true;
-  btn.textContent = 'Gerando…';
+  btn.disabled = true; btn.textContent = 'Gerando…';
   showProgress(true);
   showStatus('Iniciando geração…', 'info');
 
-  // Limpa resultados anteriores
   state.imageBlobs.forEach(b => URL.revokeObjectURL(b.url));
   state.imageBlobs = [];
   document.getElementById('resultGrid').innerHTML = '';
   document.getElementById('resultPanel').style.display = 'none';
-
-  // Aguarda um frame para UI atualizar
   await nextFrame();
 
   try {
@@ -589,31 +450,27 @@ async function gerarEscala() {
     const semanas   = dividirSemanas(escala);
 
     for (let i = 0; i < semanas.length; i++) {
-      showStatus(`Gerando Semana ${i + 1} de ${semanas.length}…`, 'info');
+      showStatus(`Gerando Semana ${i+1} de ${semanas.length}…`, 'info');
       await nextFrame();
-      const canvas = gerarSemanal(semanas[i], i + 1, state.mes);
-      const nome   = `Everyday Devocional - Escala ${state.mes}-Semana ${i + 1}.png`;
-      await addResult(canvas, nome, `Semana ${i + 1}`);
+      const c = await gerarSemanal(semanas[i], i + 1);
+      await addResult(c, `Everyday Devocional - Escala ${state.mes}-Semana ${i+1}.png`, `Semana ${i+1}`);
     }
 
     showStatus('Gerando imagem mensal…', 'info');
     await nextFrame();
-    const canvasMensal = gerarMensal(escala, state.mes);
-    const nomeMensal   = `Everyday Devocional - Escala ${state.mes} completo.png`;
-    await addResult(canvasMensal, nomeMensal, `${state.mes} completo`);
+    const cm = await gerarMensal(escala, state.mes);
+    await addResult(cm, `Everyday Devocional - Escala ${state.mes} completo.png`, `${state.mes} completo`);
 
     document.getElementById('resultPanel').style.display = 'block';
     document.getElementById('resultPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    showStatus(`✓ ${semanas.length + 1} imagem(ns) gerada(s)! Clique para baixar.`, 'ok');
 
-    const n = semanas.length + 1;
-    showStatus(`✓ ${n} imagem(ns) gerada(s) com sucesso! Clique nas imagens para baixar.`, 'ok');
   } catch (err) {
     showStatus(`Erro: ${err.message}`, 'err');
     console.error(err);
   }
 
-  btn.disabled = false;
-  btn.textContent = 'Gerar Escala';
+  btn.disabled = false; btn.textContent = 'Gerar Escala';
   showProgress(false);
 }
 
@@ -629,15 +486,13 @@ async function addResult(canvas, nome, label) {
       card.addEventListener('click', () => downloadBlob(blob, nome));
 
       const img = document.createElement('img');
-      img.src = url;
-      img.alt = label;
+      img.src = url; img.alt = label;
 
       const lbl = document.createElement('div');
       lbl.className = 'result-card-label';
       lbl.innerHTML = `<span>${label}</span><span class="result-card-dl">⬇</span>`;
 
-      card.appendChild(img);
-      card.appendChild(lbl);
+      card.appendChild(img); card.appendChild(lbl);
       document.getElementById('resultGrid').appendChild(card);
       resolve();
     }, 'image/png');
@@ -658,7 +513,7 @@ function downloadBlob(blob, name) {
 async function baixarTudo() {
   for (const item of state.imageBlobs) {
     downloadBlob(item.blob, item.name);
-    await new Promise(r => setTimeout(r, 300)); // pequeno delay entre downloads
+    await new Promise(r => setTimeout(r, 300));
   }
 }
 
