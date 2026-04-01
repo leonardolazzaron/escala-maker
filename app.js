@@ -27,7 +27,7 @@ const M_DIV1 = 481,    M_DIV2 = 1102;
 const M_HDR_H = 68,    M_ROW_H = 40.84;
 const M_SZ_HDR = 24,   M_SZ_BODY = 21;
 
-const FONT_FAMILY = "'DM Sans', Arial, sans-serif";
+const FONT_FAMILY = "'Josefin Sans', 'DM Sans', Arial, sans-serif";
 const ASSETS      = 'assets/';
 
 // ── Header image scaling (mirrors Python) ──
@@ -445,12 +445,14 @@ async function gerarMensal(escala, mes) {
     const tx = Math.round((cw - HDR_IMG_W) / 2);
     ctx.drawImage(hdrImg, tx, margin, HDR_IMG_W, tituloH);
   } else {
-    // Fallback: draw month name as text
+    // Fallback: draw month name as text (matches Pillow's draw.text where y = top of text)
     const fontSize = 72;
     ctx.font = `${fontSize}px ${FONT_FAMILY}`;
     ctx.fillStyle = '#000';
+    ctx.textBaseline = 'top';
     const tw = ctx.measureText(mes.toUpperCase()).width;
-    ctx.fillText(mes.toUpperCase(), (cw - tw) / 2, margin + fontSize);
+    ctx.fillText(mes.toUpperCase(), (cw - tw) / 2, margin);
+    ctx.textBaseline = 'alphabetic'; // restore default
   }
 
   desenharTabelaMensal(ctx, escala, tableY, rowH, M_HDR_H, szHdr, szBody);
@@ -479,6 +481,10 @@ async function gerarEscala() {
   await nextFrame();
 
   try {
+    // Ensure Josefin Sans is loaded before drawing on canvas
+    await document.fonts.load("400 72px 'Josefin Sans'");
+    await document.fonts.load("600 28px 'Josefin Sans'");
+
     const totalDias = MESES_PT[state.mes.toLowerCase()];
     const escala    = distribuirEscala(totalDias, state.nomes, state.salmos);
     const semanas   = dividirSemanas(escala);
