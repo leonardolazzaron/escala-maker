@@ -65,11 +65,13 @@ const imgCache = {};
 
 function loadImage(src) {
   if (imgCache[src]) return Promise.resolve(imgCache[src]);
+  // Encode URI to handle special characters (e.g., março.png)
+  const encodedSrc = encodeURI(src);
   return new Promise(resolve => {
     const img = new Image();
     img.onload  = () => { imgCache[src] = img; resolve(img); };
     img.onerror = () => resolve(null);
-    img.src = src;
+    img.src = encodedSrc;
   });
 }
 
@@ -406,7 +408,11 @@ async function gerarSemanal(linhas, num) {
 // Python: loads mes.png, resizes to HDR_IMG_W width keeping aspect ratio,
 // vertically centers [titulo_img + GAP_MES_TABLE + table] in 1600x2000 canvas
 async function gerarMensal(escala, mes) {
-  const hdrImg = await loadImage(`${ASSETS}${mes.toLowerCase()}.png`);
+  // Try multiple image paths (mirrors Python's _carregar_titulo_mes which tries lowercase and Capitalized)
+  const mesLower = mes.toLowerCase();
+  const mesCap   = mes.charAt(0).toUpperCase() + mes.slice(1).toLowerCase();
+  let hdrImg = await loadImage(`${ASSETS}${mesLower}.png`);
+  if (!hdrImg) hdrImg = await loadImage(`${ASSETS}${mesCap}.png`);
 
   const cw = CANVAS_W, ch = CANVAS_H;
   const nRows     = escala.length;
@@ -417,6 +423,20 @@ async function gerarMensal(escala, mes) {
   if (hdrImg) {
     const ratio = HDR_IMG_W / hdrImg.width;
     tituloH = Math.round(hdrImg.height * ratio);
+  } else {
+    // Fallback: measure text height to compute proper layout spacing
+    // Use an offscreen canvas to measure the 72px text accurately
+    const tmpCanvas = document.createElement('canvas');
+    tmpCanvas.width = 100; tmpCanvas.height = 100;
+    const tmpCtx = tmpCanvas.getContext('2d');
+    const fontSize = 72;
+    tmpCtx.font = `${fontSize}px ${FONT_FAMILY}`;
+    const metrics = tmpCtx.measureText(mes.toUpperCase());
+    // Use actualBoundingBoxAscent + Descent for accurate height, fallback to fontSize
+    tituloH = Math.round(
+      (metrics.actualBoundingBoxAscent || fontSize * 0.75) +
+      (metrics.actualBoundingBoxDescent || fontSize * 0.25)
+    );
   }
 
   let rowH = Math.floor(M_ROW_H);
