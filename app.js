@@ -288,7 +288,68 @@ function dividirSemanas(escala) {
 // ══════════════════════════════════════════════════════════════
 // GERAÇÃO DE IMAGENS VIA CANVAS
 // ══════════════════════════════════════════════════════════════
-const FONT_FAMILY = "'Josefin Sans', sans-serif";
+const FONT_FAMILY = "'DM Sans', Arial, sans-serif";
+const SUN_COLOR   = '#D45F2A';
+
+// ══════════════════════════════════════════════════════════════
+// DESENHAR SOL NO CANVAS (fiel ao logo original)
+// cx, cy = centro do semicírculo; r = raio
+// ══════════════════════════════════════════════════════════════
+function desenharSol(ctx, cx, cy, r) {
+  const sw = Math.max(2, r * 0.09);   // espessura dos traços proporcional
+  ctx.save();
+  ctx.strokeStyle = SUN_COLOR;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = sw;
+
+  // ── semicírculo ──────────────────────────────────────────
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, Math.PI, 0, false);
+  ctx.stroke();
+
+  // ── linha do horizonte ───────────────────────────────────
+  ctx.lineWidth = sw * 0.85;
+  ctx.beginPath();
+  ctx.moveTo(cx - r * 1.55, cy);
+  ctx.lineTo(cx + r * 1.55, cy);
+  ctx.stroke();
+
+  // ── raio central (topo) ──────────────────────────────────
+  ctx.lineWidth = sw;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - r * 1.55);
+  ctx.lineTo(cx, cy - r * 1.15);
+  ctx.stroke();
+
+  // ── raios diagonais (45°) ────────────────────────────────
+  const d45 = r * 0.707;
+  // superior esquerdo
+  ctx.beginPath();
+  ctx.moveTo(cx - d45 * 1.45, cy - d45 * 1.45);
+  ctx.lineTo(cx - d45 * 1.10, cy - d45 * 1.10);
+  ctx.stroke();
+  // superior direito
+  ctx.beginPath();
+  ctx.moveTo(cx + d45 * 1.45, cy - d45 * 1.45);
+  ctx.lineTo(cx + d45 * 1.10, cy - d45 * 1.10);
+  ctx.stroke();
+
+  // ── raios laterais (horizontais) ─────────────────────────
+  // esquerdo inferior (~30° abaixo do horizonte)
+  const ang = Math.PI / 6;
+  const lx  = Math.cos(Math.PI - ang) * r, ly = -Math.sin(Math.PI - ang) * r;
+  ctx.beginPath();
+  ctx.moveTo(cx + lx * 1.45, cy + ly * 1.45);
+  ctx.lineTo(cx + lx * 1.10, cy + ly * 1.10);
+  ctx.stroke();
+  // direito inferior
+  ctx.beginPath();
+  ctx.moveTo(cx - lx * 1.45, cy + ly * 1.45);
+  ctx.lineTo(cx - lx * 1.10, cy + ly * 1.10);
+  ctx.stroke();
+
+  ctx.restore();
+}
 
 function getCanvas(w, h) {
   const c = document.createElement('canvas');
@@ -359,40 +420,41 @@ function canvas45(alturaConteudo) {
 
 // ── Gerar imagem SEMANAL ──────────────────────────────────────
 function gerarSemanal(linhas, num, mes) {
-  const tabTop = 1050;   // posição vertical simplificada (sem imagem de fundo)
-  const tabBot = tabTop + HDR_H + linhas.length * ROW_H;
-  const neededH = tabBot + 60;
-  const [cw, ch] = canvas45(neededH);
+  // Layout vertical (proporcional ao original Python):
+  // topo  → sol
+  // abaixo → "SEMANA N"
+  // gap   → tabela
+  const SOL_CY      = 340;   // centro Y do semicírculo
+  const SOL_R       = 180;   // raio
+  const TITULO_Y    = SOL_CY + 80;   // baseline do texto
+  const TAB_TOP     = TITULO_Y + 120;
+  const tabBot      = TAB_TOP + HDR_H + linhas.length * ROW_H;
+  const neededH     = tabBot + 200;
+  const [cw, ch]    = canvas45(neededH);
+  const k           = cw / CANVAS_W;
 
   const canvas = getCanvas(cw, ch);
-  const ctx = canvas.getContext('2d');
+  const ctx    = canvas.getContext('2d');
 
-  // Fundo branco
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, cw, ch);
 
-  // Título da semana
-  const k = cw / CANVAS_W;
+  // Sol
+  desenharSol(ctx, cw / 2, Math.round(SOL_CY * k), Math.round(SOL_R * k));
+
+  // Título "SEMANA N"
   ctx.fillStyle = '#000';
-  ctx.font = `300 ${Math.round(36 * k)}px ${FONT_FAMILY}`;
-  ctx.letterSpacing = '3px';
-
-  const titleTxt = `${mes.toUpperCase()} · SEMANA ${num}`;
+  const szTitulo = Math.round(72 * k);
+  ctx.font = `500 ${szTitulo}px ${FONT_FAMILY}`;
+  ctx.letterSpacing = `${Math.round(4 * k)}px`;
+  const titleTxt = `SEMANA ${num}`;
   const tw = ctx.measureText(titleTxt).width;
-  ctx.fillText(titleTxt, (cw - tw) / 2, Math.round(900 * k));
-
-  // Linha decorativa
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = Math.max(1, Math.round(2 * k));
-  const lineY = Math.round(960 * k);
-  ctx.beginPath();
-  ctx.moveTo(Math.round(TABLE_L * k), lineY);
-  ctx.lineTo(Math.round(TABLE_R * k), lineY);
-  ctx.stroke();
+  ctx.fillText(titleTxt, (cw - tw) / 2, Math.round(TITULO_Y * k));
 
   // Tabela
-  ctx.fillStyle = '#000';
-  desenharTabela(ctx, linhas, Math.round(tabTop * k), cw);
+  ctx.fillStyle  = '#000';
+  ctx.letterSpacing = '0px';
+  desenharTabela(ctx, linhas, Math.round(TAB_TOP * k), cw);
 
   return canvas;
 }
@@ -401,17 +463,29 @@ function gerarSemanal(linhas, num, mes) {
 function gerarMensal(escala, mes) {
   const cw = CANVAS_W, ch = CANVAS_H;
   const nRows = escala.length;
-  const GAP_MES_TABLE = 80;
-  const tituloH = 120;
+
+  // Layout vertical (espelha o original Python):
+  // sol centralizado no topo, depois nome do mês, depois tabela
+  const SOL_CY   = 310;
+  const SOL_R    = 200;
+  const TITULO_Y = SOL_CY + 100;   // baseline do nome do mês
+  const GAP_TABLE = 100;
+  const tituloH  = TITULO_Y + GAP_TABLE;
+
   let rowH = Math.round(M_ROW_H);
-  const conteudo = tituloH + GAP_MES_TABLE + M_HDR_H + nRows * rowH;
+  const conteudo = tituloH + M_HDR_H + nRows * rowH;
   let margin = Math.round((ch - conteudo) / 2);
   if (margin < 40) {
     margin = 40;
-    const availRows = ch - 2 * margin - tituloH - GAP_MES_TABLE - M_HDR_H;
+    const availRows = ch - margin - tituloH - M_HDR_H;
     rowH = Math.max(22, Math.round(availRows / nRows));
   }
-  const tableY = margin + tituloH + GAP_MES_TABLE;
+  // Recompute tableY using actual margin (top offset)
+  const topOffset  = margin < 60 ? 60 : margin * 0.3;
+  const solCyReal  = topOffset + SOL_R + 40;
+  const tituloYReal = solCyReal + 90;
+  const tableY     = tituloYReal + GAP_TABLE;
+
   const scaleFont = rowH / M_ROW_H;
   const szHdr  = Math.max(14, Math.round(M_SZ_HDR  * scaleFont));
   const szBody = Math.max(12, Math.round(M_SZ_BODY * scaleFont));
@@ -419,27 +493,22 @@ function gerarMensal(escala, mes) {
   const canvas = getCanvas(cw, ch);
   const ctx = canvas.getContext('2d');
 
-  // Fundo branco
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, cw, ch);
 
-  // Título do mês
+  // Sol
+  desenharSol(ctx, cw / 2, solCyReal, SOL_R);
+
+  // Nome do mês
   ctx.fillStyle = '#000';
-  ctx.font = `400 80px ${FONT_FAMILY}`;
-  ctx.letterSpacing = '8px';
+  ctx.font = `400 100px ${FONT_FAMILY}`;
+  ctx.letterSpacing = '10px';
   const mesTitle = mes.toUpperCase();
   const titleW = ctx.measureText(mesTitle).width;
-  ctx.fillText(mesTitle, (cw - titleW) / 2, margin + 90);
-
-  // Linha decorativa
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 2;
-  const lineY = margin + tituloH + 20;
-  ctx.beginPath();
-  ctx.moveTo(M_TABLE_L, lineY); ctx.lineTo(M_TABLE_R, lineY);
-  ctx.stroke();
+  ctx.fillText(mesTitle, (cw - titleW) / 2, tituloYReal);
 
   // Tabela mensal
+  ctx.letterSpacing = '0px';
   desenharTabelaMensal(ctx, escala, tableY, rowH, M_HDR_H, szHdr, szBody);
 
   return canvas;

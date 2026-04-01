@@ -20,8 +20,7 @@
   --radius-sm: 8px;
   --radius-md: 14px;
   --radius-lg: 22px;
-  --font-display: 'DM Serif Display', serif;
-  --font-body: 'Josefin Sans', sans-serif;
+  --font-body: 'DM Sans', Arial, sans-serif;
 }
 
 *, *::before, *::after {
@@ -67,23 +66,19 @@ body {
   gap: 10px;
 }
 
-.logo-mark {
-  font-size: 20px;
-  color: var(--black);
-  line-height: 1;
-  animation: pulse 3s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+.logo-sun {
+  width: 72px;
+  height: 48px;
+  flex-shrink: 0;
 }
 
 .logo-text {
-  font-family: var(--font-display);
-  font-size: 26px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
   color: var(--black);
-  letter-spacing: 0.5px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
 }
 
 .header-sub {
@@ -401,8 +396,10 @@ body {
 }
 
 .result-title {
-  font-family: var(--font-display);
-  font-size: 18px;
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 1px;
   color: var(--black);
 }
 
