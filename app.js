@@ -30,6 +30,24 @@ const M_SZ_HDR = 24,   M_SZ_BODY = 21;
 const FONT_FAMILY = "'DM Sans', Arial, sans-serif";
 const ASSETS      = 'assets/';
 
+// ── Header image scaling (mirrors Python) ──
+const TABLE_W        = TABLE_R - TABLE_L;  // 1428
+const _SRC_IMG_W     = 1807, _SRC_IMG_H = 1426;
+const _SRC_ORANGE_X1 = 104,  _SRC_ORANGE_X2 = 1702;
+const _SRC_ORANGE_W  = _SRC_ORANGE_X2 - _SRC_ORANGE_X1;  // 1598
+const _ORANGE_TARGET = Math.floor(TABLE_W * 0.397);       // 566
+const HDR_SCALE_F    = _ORANGE_TARGET / _SRC_ORANGE_W;    // ~0.3542
+const HDR_IMG_W      = Math.floor(_SRC_IMG_W * HDR_SCALE_F);  // 640
+const HDR_IMG_H      = Math.floor(_SRC_IMG_H * HDR_SCALE_F);  // 505
+const HDR_X          = Math.floor((CANVAS_W - HDR_IMG_W) / 2);
+
+const _SEM_OY1       = Math.floor(73  * HDR_SCALE_F);
+const _SEM_OY2       = Math.floor(871 * HDR_SCALE_F);
+
+const WEEKLY_IMG_Y       = 307;
+const WEEKLY_ORANGE_BOT  = WEEKLY_IMG_Y + _SEM_OY2;
+const WEEKLY_GAP_TABLE   = 201;
+
 // ══════════════════════════════════════════════════════════════
 // ESTADO
 // ══════════════════════════════════════════════════════════════
@@ -63,23 +81,10 @@ document.addEventListener('DOMContentLoaded', () => {
   setupInputListeners();
   setupDragDrop('listNomes');
   setupDragDrop('listSalmos');
-  carregarLogoApp();
 });
 
-// Logo do header do app vindo de assets/escala-maker.png
-async function carregarLogoApp() {
-  const img = await loadImage(`${ASSETS}escala-maker.png`);
-  if (!img) return;
-  const logoImg = document.getElementById('appLogoImg');
-  if (logoImg) {
-    logoImg.src = img.src;
-    logoImg.style.display = 'block';
-    const svgFallback = document.querySelector('.logo-sun');
-    const txtFallback = document.querySelector('.logo-text');
-    if (svgFallback) svgFallback.style.display = 'none';
-    if (txtFallback) txtFallback.style.display  = 'none';
-  }
-}
+// Logo do header do app — usa diretamente assets/escala-maker.png via <img> no HTML
+// Nenhuma lógica JS necessária; fallback tratado via onerror no <img>
 
 // ══════════════════════════════════════════════════════════════
 // GRID DE MESES
@@ -360,12 +365,14 @@ function desenharTabelaMensal(ctx, linhas, yIni, rowH, hdrH, szHdr, szBody) {
 // ══════════════════════════════════════════════════════════════
 
 // SEMANAL — usa assets/semana-N.png como header
-// O Python posiciona a imagem em y=307 e a tabela em y≈1382 (base CANVAS_W=1600)
+// Matches Python: header resized to HDR_IMG_W x HDR_IMG_H, placed at (HDR_X, WEEKLY_IMG_Y)
+// Table starts at WEEKLY_ORANGE_BOT + WEEKLY_GAP_TABLE
 async function gerarSemanal(linhas, num) {
   const hdrImg       = await loadImage(`${ASSETS}semana-${num}.png`);
-  const TAB_TOP_BASE = 1382;
+  const TAB_TOP_BASE = WEEKLY_ORANGE_BOT + WEEKLY_GAP_TABLE;  // 816
   const tabBot       = TAB_TOP_BASE + HDR_H + linhas.length * ROW_H;
-  const [cw, ch]     = canvas45(tabBot + 200);
+  const neededH      = tabBot + 60;
+  const [cw, ch]     = canvas45(neededH);
   const k            = cw / CANVAS_W;
 
   const canvas = getCanvas(cw, ch);
@@ -374,11 +381,21 @@ async function gerarSemanal(linhas, num) {
   ctx.fillRect(0, 0, cw, ch);
 
   if (hdrImg) {
-    // Escala para 90% da largura do canvas, mantendo proporção, centralizado
-    const scale = (cw * 0.9) / hdrImg.width;
-    const imgW  = Math.round(hdrImg.width  * scale);
-    const imgH  = Math.round(hdrImg.height * scale);
-    ctx.drawImage(hdrImg, Math.round((cw - imgW) / 2), Math.round(307 * k), imgW, imgH);
+    // Resize header to HDR_IMG_W x HDR_IMG_H (scaled by k if canvas differs)
+    const imgW = Math.round(HDR_IMG_W * k);
+    const imgH = Math.round(HDR_IMG_H * k);
+    const hx   = Math.round((cw - imgW) / 2);
+    const hy   = Math.round(WEEKLY_IMG_Y * k);
+    const pasteY = Math.max(0, hy);
+    const cropY  = Math.max(0, -hy);
+    // Draw with possible crop from top
+    if (cropY > 0) {
+      const srcCropY = Math.round(cropY * (hdrImg.height / imgH));
+      const srcH     = hdrImg.height - srcCropY;
+      ctx.drawImage(hdrImg, 0, srcCropY, hdrImg.width, srcH, hx, pasteY, imgW, imgH - cropY);
+    } else {
+      ctx.drawImage(hdrImg, hx, pasteY, imgW, imgH);
+    }
   }
 
   desenharTabela(ctx, linhas, Math.round(TAB_TOP_BASE * k), cw);
@@ -386,24 +403,34 @@ async function gerarSemanal(linhas, num) {
 }
 
 // MENSAL — usa assets/<mes>.png como header
-// O Python posiciona a imagem com crop no topo (MONTHLY_IMG_Y ≈ -242)
-// e a tabela começa em torno de y=750-800
+// Python: loads mes.png, resizes to HDR_IMG_W width keeping aspect ratio,
+// vertically centers [titulo_img + GAP_MES_TABLE + table] in 1600x2000 canvas
 async function gerarMensal(escala, mes) {
   const hdrImg = await loadImage(`${ASSETS}${mes.toLowerCase()}.png`);
 
   const cw = CANVAS_W, ch = CANVAS_H;
   const nRows     = escala.length;
-  const HDR_BLOCK = 780;   // altura reservada para o bloco de header
   const GAP_TABLE = 60;
 
-  let rowH = Math.round(M_ROW_H);
-  let topPad = Math.round((ch - HDR_BLOCK - GAP_TABLE - M_HDR_H - nRows * rowH) / 2);
-  if (topPad < 40) {
-    topPad = 40;
-    rowH = Math.max(22, Math.round((ch - topPad - HDR_BLOCK - GAP_TABLE - M_HDR_H) / nRows));
+  // Calculate titulo_img height (resized to HDR_IMG_W width)
+  let tituloH = 0;
+  if (hdrImg) {
+    const ratio = HDR_IMG_W / hdrImg.width;
+    tituloH = Math.round(hdrImg.height * ratio);
   }
 
-  const tableY    = topPad + HDR_BLOCK + GAP_TABLE;
+  let rowH = Math.floor(M_ROW_H);
+  let conteudo = tituloH + GAP_TABLE + M_HDR_H + nRows * rowH;
+  let margin   = Math.floor((ch - conteudo) / 2);
+  if (margin < 40) {
+    margin = 40;
+    const availRows = ch - 2 * margin - tituloH - GAP_TABLE - M_HDR_H;
+    rowH = Math.max(22, Math.floor(availRows / nRows));
+    conteudo = tituloH + GAP_TABLE + M_HDR_H + nRows * rowH;
+    margin   = Math.floor((ch - conteudo) / 2);
+  }
+
+  const tableY    = margin + tituloH + GAP_TABLE;
   const scaleFont = rowH / M_ROW_H;
   const szHdr     = Math.max(14, Math.round(M_SZ_HDR  * scaleFont));
   const szBody    = Math.max(12, Math.round(M_SZ_BODY * scaleFont));
@@ -414,9 +441,16 @@ async function gerarMensal(escala, mes) {
   ctx.fillRect(0, 0, cw, ch);
 
   if (hdrImg) {
-    // Escala para largura total do canvas; sobe ~18% para simular o crop do Python
-    const imgH = Math.round(hdrImg.height * (cw / hdrImg.width));
-    ctx.drawImage(hdrImg, 0, topPad - Math.round(imgH * 0.18), cw, imgH);
+    // Draw mes image resized to HDR_IMG_W, centered horizontally, at y=margin
+    const tx = Math.round((cw - HDR_IMG_W) / 2);
+    ctx.drawImage(hdrImg, tx, margin, HDR_IMG_W, tituloH);
+  } else {
+    // Fallback: draw month name as text
+    const fontSize = 72;
+    ctx.font = `${fontSize}px ${FONT_FAMILY}`;
+    ctx.fillStyle = '#000';
+    const tw = ctx.measureText(mes.toUpperCase()).width;
+    ctx.fillText(mes.toUpperCase(), (cw - tw) / 2, margin + fontSize);
   }
 
   desenharTabelaMensal(ctx, escala, tableY, rowH, M_HDR_H, szHdr, szBody);
